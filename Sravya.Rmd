@@ -1,0 +1,242 @@
+---
+title: "Explore Recruitment Bias "
+author: "Sravya Gudipudi"
+date: "22/06/2022"
+output: 
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+## Summary
+
+Employee recruitment involves the process of selection in the human resource management to choose the most suitable candidate from a group of applicants who have applied for a certain job position. In the process of employee recruitment the unsuitable candidates are selected. However, in most cases there happens to have biasness in the process of employee recruitment. This can either be unconscious bias or conscious bias. Either concious biasness or unconscious biasness, this brings in a problem into the company since the employees selected might not be up to the task and not talented for the job position as the company might require. This is because there might be wrong candidates selected leaving out the most suitable candidates as a result of recruitment bias. Therefore,this project will implement machine learning algorithm that will help in the accurate and reliable selection of the most suitable candidates from a group of applicants and also predict the employees to be shortlisted and what are the key drivers for shortlisting the most suitable candidates for any given job vacancy. The project will answer the research question, does age and ethinicity have any influence on the shortlisting of the most suitable candidates?
+
+
+## Introduction
+
+In the case where the recruitment team in the human resource department have unchecked bias towards applicants of a given job vacancy, they perpetaute inequality and discriminition. In a workplace, bias hiring, promotion, training, or termination will always lead to inequality and disparity that affects the company negatively in terms of productivity and revenue gain. According to Kidwell et al. (2018), organizations that have practiced bias recruitment are always faced loss of employee morale, diverse experiences and ideas, and litigation. Unhealthy company culture and high turnover in an organization are always because of bias recruitment. Therefore, this paper intends to work on the process of developing a model that can eliminate the recruitment bias for organization as well as perform analysis on the factors that majorly influence recruitment bias. 
+
+## Literature Review
+
+In most cases, the entire recruitment team might be biased when selecting the most suitable candidates without their knowledge (Raghavan et al., 2020). According to Raghavan et al. (2020), recruitment bias always affects the potential candidates for a given job position negatively in terms of promotion, compensation, and evaluation. Many organizations do not have an already defined process for recruitment. The recruitment process according to Moher et al. (2018) is always dependent on the job requirements, nature, and the type. Organizations always adopt their own recruitment process to choose from a group of applicants the most suitable applicants for interview. This freedom of choice for recruitment process therefore, brings in a higher probability of being bias either conscious or unconcious. Therefore, having the need for this project to be developed to help solve the problem of recruitment bias. 
+
+## Theory
+
+H1: The shortlisting process is influenced by gender and ethnicity. 
+
+## Data
+
+The dataset has been retrieved from Kaggle.com website. It includes:
+
+
+```{r echo=FALSE}
+# Libraries
+#install.packages("tidyquant")
+library(tidyverse)
+library(tidyquant)
+library(readxl)
+library(forcats)
+library(stringr)
+# install.packages('caTools')
+
+library(caTools)
+library(ROCR) 
+library(pROC) 
+library(rattle) # Decision Trees visualization
+library(rpart.plot)
+library(RColorBrewer)
+#install.packages("psych")
+library(psych) 
+library("caret")
+library("GGally")
+#install.packages("janitor")
+library(janitor)
+#install.packages("corrplot")
+library(corrplot)
+#install.packages('e1071', dependencies=TRUE)
+#install.packages("car")
+library(car)
+#install.packages("expss")
+library(expss)
+
+```
+
+
+```{r echo=FALSE}
+recruitment_hr <- read.delim("C:/Users/User/Downloads/New folder/recruitment_hr.txt")
+glimpse(recruitment_hr)
+```
+First we check if there are any missing values in the dataset. 
+```{r}
+sapply(recruitment_hr, function(x) sum(is.na(x)))
+```
+There are columns with missing values. We remove rows with the missing values. 
+
+
+```{r}
+recruitmenthr <- recruitment_hr[complete.cases(recruitment_hr), ]
+sapply(recruitmenthr, function(x) sum(is.na(x)))
+
+```
+
+## Methodology
+
+With data having been cleaned, next will involve working with the dataset for exploratory and descriptive data analysis. 
+
+First, we gain insights into the number of applicants by their Gender.
+
+```{r}
+recruitment_hr %>%
+  select(ApplicantCode,Gender)%>%
+  group_by(Gender) %>%
+    summarize(n = n()) %>%
+    ungroup() %>%
+    mutate(Percent = n / sum(n)*100) %>%
+    mutate(Gender = factor(Gender, labels = c("Male","Female"))) %>%
+    adorn_totals("row")
+
+```
+
+Next, we perform analysis to identify the number of applicants by their residence in the location of the company. 
+
+```{r}
+recruitment_hr %>%
+  select(ApplicantCode,ATSIyn)%>%
+  group_by(ATSIyn) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  mutate(Percent = n / sum(n)*100) %>%
+  mutate(ATSIyn = factor(ATSIyn, labels = c("Aboriginal Torres Strait Islander","General")))%>%
+  adorn_totals("row")
+
+```
+Next we perform analysis on the number of accepted candidates and the rejected candidates. 
+
+
+```{r}
+recruitment_hr %>%
+  select(ApplicantCode,ShortlistedNY)%>%
+  group_by(ShortlistedNY) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  mutate(Percent = n / sum(n)*100) %>%
+  adorn_totals("row")
+```
+Next, an analysis on the number of candidates interviewed is performed. 
+
+```{r}
+recruitment_hr %>%
+  select(ApplicantCode,Interviewed)%>%
+  group_by(Interviewed) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  mutate(Percent = n / sum(n)*100) %>%
+  mutate(Interviewed = factor(Interviewed, labels = c("Not Interviewed","Interviewed")))%>%
+  adorn_totals("row")
+
+```
+
+To decide on whether there was fairness in gender, we perform analysis on the number of Females on the interview panel. 
+
+```{r}
+recruitment_hr %>%
+  select(ApplicantCode,FemaleONpanel)%>%
+  na.omit()%>%
+  group_by(FemaleONpanel) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  mutate(Percent = n / sum(n)*100) %>%
+  mutate(FemaleONpanel = factor(FemaleONpanel, labels = c("Male Only","Female Panel member")))%>%
+  adorn_totals("row")
+```
+Analysis on ethnicity and shortlisting of the applicants. 
+
+```{r}
+tbl = table(factor(recruitment_hr$ATSIyn,labels = c("Aboriginal Torres Strait Islander","General Applicant")),factor(recruitment_hr$ShortlistedNY,
+                                                                      labels = c("Not Shortlisted","Shortlisted")))
+addmargins(tbl)  
+```
+Analysis on Gender and shortlisting of the applicants.
+
+```{r}
+tbl = table(factor(recruitment_hr$Gender,labels = c("Male","Female")),factor(recruitment_hr$ShortlistedNY,
+                                                                      labels = c("Not Shortlisted","Shortlisted")))
+addmargins(tbl)   
+```
+Create a logistic regression model for predicting the shortlisting of applicants. 
+```{r}
+set.seed(7)
+lr <- glm(ShortlistedNY ~ Gender + ATSIyn,family=binomial("logit"),data = recruitment_hr)
+summary(lr)
+```
+
+## Results
+
+ The analysis provided information regarding the objective of this paper. First, it has been identified that for the applicants who applied for the job position there were more Female applicants than Male applicants. Female applicants occupied 72.1% of the total applicants. 
+
+
+```{r echo=FALSE}
+
+recruitment_hr %>%
+  select(ApplicantCode,Gender)%>%
+  group_by(Gender) %>%
+    summarize(n = n()) %>%
+    ungroup() %>%
+    mutate(Percent = n / sum(n)*100) %>%
+    mutate(Gender = factor(Gender, labels = c("Male","Female"))) %>%
+    adorn_totals("row")
+
+```
+For ethnicity distribution among the applicants, 43.2% of the applicants were Aboriginal or Toress Strait Islander.
+
+```{r echo=FALSE}
+recruitment_hr %>%
+  select(ApplicantCode,ATSIyn)%>%
+  group_by(ATSIyn) %>%
+  summarize(n = n()) %>%
+  ungroup() %>%
+  mutate(Percent = n / sum(n)*100) %>%
+  mutate(ATSIyn = factor(ATSIyn, labels = c("Aboriginal Torres Strait Islander","General")))%>%
+  adorn_totals("row")
+
+
+```
+Therefore, to ensure that there is no gender or ethnicity bias, there should have a fair similar portion of 72% female shortlisted and 43.2% applicants from Aboriginal or Toress Strait Islander shortlisted.
+
+However, the analysis results for ethinicity, the shortlisted the individuals from Aboriginal Torres Strait Islander accounted for 15%. That means the shortlisting was more on the general applicants. 
+
+
+```{r echo=FALSE}
+tbl = table(factor(recruitment_hr$ATSIyn,labels = c("Aboriginal Torres Strait Islander","General Applicant")),factor(recruitment_hr$ShortlistedNY,
+                                                                      labels = c("Not Shortlisted","Shortlisted")))
+addmargins(tbl) 
+```
+Results also show that 56.7% of the females were shortlisted. There was a high number of rejections from 72% of the total applicant females to 56.7% shortlisted females which suggest that there is bias towards male applicants. 
+
+```{r echo=FALSE}
+
+tbl = table(factor(recruitment_hr$Gender,labels = c("Male","Female")),factor(recruitment_hr$ShortlistedNY,
+                                                                      labels = c("Not Shortlisted","Shortlisted")))
+addmargins(tbl)
+```
+## Implications
+
+To help solve the problem of recruitment bias, I would recommend from the results of this paper that the recruitment department in any organisation should implement a strategy that ensures that ethnicity background, gender, and name of the applicant is hidden from the recruiter reviewing the job application.
+
+## Conclusion
+
+From the data analysis performed in this paper, it is clear that ethnicity and gender bias exist in the recruitment process of shortlisting the suitable candidates from a pool of interested applicants. Therefore, the theory that the shortlisting process is influenced by gender and ethnicity is true.  
+
+# References
+
+Kidwell, R. E., Eddleston, K. A., & Kellermanns, F. W. (2018). Learning bad habits across 	generations: How negative imprints affect human resource management in the family 	firm. Human Resource Management Review, 28(1), 5-17.
+
+Moher, D., Naudet, F., Cristea, I. A., Miedema, F., Ioannidis, J. P., & Goodman, S. N. (2018). 	Assessing scientists for hiring, promotion, and tenure. PLoS biology, 16(3), e2004089.
+
+Raghavan, M., Barocas, S., Kleinberg, J., & Levy, K. (2020, January). Mitigating bias in 	algorithmic hiring: Evaluating claims and practices. In Proceedings of the 2020 	conference on fairness, accountability, and transparency (pp. 469-481).
+
